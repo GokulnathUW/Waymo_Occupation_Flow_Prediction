@@ -1,0 +1,42 @@
+# least_squares.sub - an example HTCondor submit file
+# for passing arguments
+
+# Software environment
+container_image = docker://thilak007/tensorflow_waymo:v1
+
+# Custom variable can be specified
+output_file_name = waymo_resnet_50v2
+
+# Specify your executable and your arguments
+# Usage: least_squares.py [CSV] [Country] [Year, optional]
+executable = deploy.sh
+#arguments = 
+
+# Specify the log, standard error, and standard output
+# (or screen output) files
+log = $(output_file_name).log
+error = $(output_file_name).err
+output = $(output_file_name).out
+
+# We need to also transfer the csv file for the
+# calculation
+transfer_input_files = flow_prediction.py, model.py, loss_functions.py, testing.py, config.txt, batch_count.txt, osdf:///chtc/staging/sourirajan/flow_prediction_stat453/waymo_open_dataset.tar.gz
+
+transfer_output_files = model_weights_ResNet50V2.h5, model_ResNet50V2.h5, batch_count.txt, flow_prediction.out
+
+# Requirements for our calculation
+request_cpus = 16
+request_memory = 16GB
+request_disk = 10GB
+
+#GPUs
+request_gpus = 1
++WantGPULab = true
++GPUJobLength = "short"
+
+gpus_minimum_memory = 16000
+
+#gpus_minimum_capability = 12.1.1
+
+# Tell HTCondor to run 1 instance of our calculation
+queue
