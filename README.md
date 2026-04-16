@@ -1,93 +1,252 @@
-# waymo_occ_flow_prediction
+# Waymo Occupancy Flow Prediction
 
+Predicting future vehicle occupancy and motion flow for autonomous driving using the Waymo Open Dataset.
 
+## Overview
 
-## Getting started
+This project implements a deep learning-based approach to predict where vehicles will be in future timesteps, including both observed and occluded vehicles. The model uses a ResNet50V2 encoder-decoder architecture to predict:
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+1. **Observed Occupancy**: Grid cells occupied by currently visible vehicles
+2. **Occluded Occupancy**: Grid cells occupied by hidden/occluded vehicles  
+3. **Vehicle Flow**: Direction vectors (dx, dy) showing vehicle movement
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+The task is formulated as a grid-based prediction problem where the scene is discretized into cells, and the model predicts occupancy and flow for each cell across multiple future waypoints.
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## Architecture
 
 ```
-cd existing_repo
-git remote add origin https://git.doit.wisc.edu/sourirajan/waymo_occ_flow_prediction.git
-git branch -M main
-git push -uf origin main
+Input Grids (Roadgraph + Past/Present Occupancy)
+    ↓
+ResNet50V2 Encoder
+    ↓
+Progressive Upsampling Decoder
+    ↓
+Multi-channel Output (Occupancy + Flow per Waypoint)
 ```
 
-## Integrate with your tools
+### Model Components
 
-- [ ] [Set up project integrations](https://git.doit.wisc.edu/sourirajan/waymo_occ_flow_prediction/-/settings/integrations)
+- **Encoder**: ResNet50V2 backbone for feature extraction
+- **Decoder**: 5-stage upsampling pipeline with intermediate convolutions
+- **Output**: 4 channels per waypoint (observed occupancy, occluded occupancy, flow dx, flow dy)
 
-## Collaborate with your team
+### Loss Function
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+The training objective combines three components:
 
-## Test and Deploy
+```
+L_total = L_observed_CE + L_occluded_CE + L_flow
+```
 
-Use the built-in continuous integration in GitLab.
+- **L_observed_CE**: Sigmoid cross-entropy for observed vehicle occupancy (weight: 1000)
+- **L_occluded_CE**: Sigmoid cross-entropy for occluded vehicle occupancy (weight: 1000)  
+- **L_flow**: L1 loss on flow vectors (masked for zero-flow regions, weight: 1)
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## Project Structure
 
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```
+├── config/                  # Configuration management
+│   ├── config.py           # Task, model, and path configurations
+│   └── task_config.txt     # Waymo task-specific parameters
+├── data/                    # Data loading utilities
+│   └── data_loader.py      # TFRecord dataset creation and batching
+├── models/                  # Model architectures
+│   └── resnet_encoder.py   # ResNet-based encoder-decoder
+├── trainers/                # Training pipeline
+│   └── trainer.py          # Training loop with validation
+├── evaluators/              # Evaluation pipeline
+│   └── evaluator.py        # Model evaluation and metrics
+├── utils/                   # Utility functions
+│   ├── loss_functions.py   # Multi-component loss implementations
+│   └── preprocessing.py    # Input grid creation and transformation
+├── viz/                     # Visualization utilities
+│   └── visualization.py    # Trajectory and animation generation
+├── train.py                 # Main training entry point
+├── evaluate.py              # Main evaluation entry point
+├── visualize.py             # Visualization script
+├── deploy.sh                # Deployment script
+├── deploy.sub               # HTCondor submission file
+├── Dockerfile               # Container definition
+└── requirements.txt         # Python dependencies
+```
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+### Requirements
+
+- Python 3.8+
+- TensorFlow 2.12+
+- Waymo Open Dataset toolkit
+- Matplotlib, NumPy
+
+### Setup
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd Waymo_Occupation_Flow_Prediction
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Download Waymo Open Dataset
+# Place dataset in waymo_open_dataset/ directory with:
+#   - training/training_tfexample.tfrecord*
+#   - validation/validation_tfexample.tfrecord*
+#   - test/testing_tfexample.tfrecord*
+```
+
+### Docker
+
+```bash
+# Build image
+docker build -t waymo-occupancy-flow .
+
+# Run training
+docker run --gpus all -v /path/to/data:/app/data waymo-occupancy-flow python train.py
+```
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### Training
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+# Default training
+python train.py
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+# Custom parameters
+python train.py --epochs 20 --batch-size 8 --encoder ResNet50V2
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+# Force batch recount
+python train.py --force-recount
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Evaluation
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+# Evaluate with default checkpoints
+python evaluate.py
+
+# Custom weights path
+python evaluate.py --weights-path path/to/weights.h5
+```
+
+### Visualization
+
+```bash
+# Generate frame visualizations
+python visualize.py --output-dir ./viz_output --num-samples 10
+
+# Create animations (requires ffmpeg)
+python visualize.py --output-dir ./viz_output --create-animation
+```
+
+## Configuration
+
+Task-specific parameters are defined in `config/task_config.txt`:
+
+| Parameter                  | Value | Description                                  |
+|---------------------------|-------|----------------------------------------------|
+| num_past_steps           | 10    | Number of past timesteps                     |
+| num_future_steps         | 80    | Number of future timesteps to predict        |
+| num_waypoints            | 8     | Number of prediction waypoints               |
+| grid_height_cells        | 256   | Grid height in cells                         |
+| grid_width_cells         | 256   | Grid width in cells                          |
+| pixels_per_meter         | 3.2   | Spatial resolution                           |
+| normalize_sdc_yaw        | true  | Normalize to SDC-centric coordinates         |
+
+Model hyperparameters are in `config/config.py`:
+
+| Parameter         | Value  | Description                    |
+|------------------|--------|--------------------------------|
+| LEARNING_RATE    | 1e-3   | Adam optimizer learning rate   |
+| BATCH_SIZE       | 16     | Training batch size            |
+| TRAIN_EPOCHS     | 15     | Number of training epochs      |
+| ENCODER          | ResNet50V2 | Encoder architecture       |
+
+## Dataset
+
+This project uses the **Waymo Open Dataset** Occupancy and Flow prediction task.
+
+- **Input**: 10 past timesteps of agent positions + roadgraph
+- **Output**: 80 future timesteps aggregated into 8 waypoints
+- **Grid**: 256×256 cells centered on the self-driving car
+
+## Methodology
+
+### Data Preprocessing
+
+1. Parse TFRecord examples using Waymo Open Dataset utilities
+2. Extract SDC (self-driving car) state for coordinate normalization
+3. Create ground truth grids:
+   - **TimestepGrids**: Occupancy + flow for each timestep
+   - **WaypointGrids**: Subsampled timesteps at prediction intervals
+   - **VisGrids**: Visualization-friendly format
+
+### Model Input
+
+The model receives a multi-channel tensor:
+- Roadgraph (static context)
+- Vehicle past occupancy
+- Vehicle current occupancy
+- Pedestrian+cyclist past occupancy (superimposed)
+- Pedestrian+cyclist current occupancy (superimposed)
+
+### Training Pipeline
+
+For each training step:
+1. Forward pass through encoder-decoder
+2. Slice predictions into waypoint-specific grids
+3. Compute multi-component loss
+4. Backpropagate gradients with Adam optimizer
+
+## Performance Metrics
+
+The evaluation reports three loss components:
+- **Observed Occupancy CE**: Lower is better (accuracy of visible vehicle prediction)
+- **Occluded Occupancy CE**: Lower is better (ability to predict hidden vehicles)
+- **Flow Loss**: Lower is better (accuracy of motion vector prediction)
+
+## Reproducing Results
+
+```bash
+# 1. Setup environment
+pip install -r requirements.txt
+
+# 2. Count dataset batches (first run only)
+python -c "from data.data_loader import create_data_iterators, get_or_count_batches; \
+           from config.config import PathConfig, ModelConfig; \
+           mc = ModelConfig(); pc = PathConfig(); \
+           train_it, val_it, test_it = create_data_iterators(pc.TRAIN_FILES, pc.VAL_FILES, pc.TEST_FILES, mc.BATCH_SIZE); \
+           get_or_count_batches(train_it, val_it, test_it, pc.BATCH_COUNT_FILE)"
+
+# 3. Train model
+python train.py --epochs 15
+
+# 4. Evaluate
+python evaluate.py
+
+# 5. Visualize results
+python visualize.py --num-samples 5
+```
+
+## Citation
+
+If you use this code, please cite the Waymo Open Dataset paper:
+
+```
+@misc{waymo_open_dataset,
+  title={Waymo Open Dataset: Occupancy and Flow Prediction},
+  author={Waymo},
+  year={2023}
+}
+```
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+This project is for academic/educational use. See the Waymo Open Dataset terms of use for dataset licensing.
+
+## Acknowledgments
+
+- Waymo Open Dataset for providing the dataset and evaluation utilities
+- TensorFlow for deep learning framework support

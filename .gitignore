@@ -1,0 +1,67 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.egg-info
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model checkpoints (large files)
+*.h5
+*.hdf5
+*.ckpt
+*.pt
+*.pth
+model_*.h5
+model_weights_*.h5
+
+# Output files
+*.out
+*.log
+*.err
+batch_count.txt
+*_summary.txt
+
+# Archives
+*.tar.gz
+output_models.tar.gz
+
+# Dataset (should be downloaded separately)
+waymo_open_dataset/
+
+# Visualization outputs
+visualizations/
+*.mp4
+*.avi
+
+# Profiling
+*.prof
+*.pstats
+
+# Coverage
+coverage/
+.coverage
+htmlcov/

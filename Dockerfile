@@ -1,14 +1,25 @@
-# Use an official Python image as a base (you can choose a version like 3.8)
+# Dockerfile for Waymo Occupancy Flow Prediction
+# Based on TensorFlow GPU image with Waymo Open Dataset support
+
 FROM tensorflow/tensorflow:2.12.0-gpu
 
+# Install Waymo Open Dataset toolkit
 RUN pip install waymo-open-dataset-tf-2-12-0==1.6.4
 
-RUN apt-get update && apt-get install -y ffmpeg
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory inside the container
+# Set working directory
 WORKDIR /app
-# Copy the rest of your application code (if any)
-# COPY . /app
 
-# Command to run when the container starts (can be modified for your needs)
-CMD ["echo", "hello"]
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . /app
+
+# Default command
+CMD ["python", "train.py", "--help"]
